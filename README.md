@@ -73,6 +73,7 @@ OPENAI_COMPATIBLE_TIMEOUT="60000"  # Optional, default timeout in milliseconds
 - 如果配置了 OpenAI 兼容选项，将优先使用该配置而非 AWS Bedrock
 - 请确保你的端点可访问且返回 OpenAI 格式的响应
 - 如果遇到 404 错误，请验证你的基础 URL 是否正确以及端点是否已正确部署
+- 环境变量中的引号和空格会被自动处理，确保模型名称不会被截断
 
 **Important Notes:**
 - All three variables (`BASE_URL`, `MODEL`, and `API_KEY`) must be set together for the OpenAI-compatible provider to work
@@ -81,6 +82,7 @@ OPENAI_COMPATIBLE_TIMEOUT="60000"  # Optional, default timeout in milliseconds
 - If the OpenAI-compatible configuration is present, it will be used instead of AWS Bedrock
 - Make sure your endpoint is accessible and returns responses in OpenAI's format
 - If you see 404 errors, verify your base URL is correct and the endpoint is properly deployed
+- Environment variable quotes and whitespace are automatically handled to prevent model name truncation
 
 4. Run the development server:
 

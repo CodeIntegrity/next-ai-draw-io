@@ -13,25 +13,29 @@ export const maxDuration = 60
 const openrouter = createOpenRouter({ apiKey: process.env.OPENROUTER_API_KEY });
 
 // Initialize OpenAI compatible provider if configured
-const openaiCompatible = process.env.OPENAI_COMPATIBLE_BASE_URL && process.env.OPENAI_COMPATIBLE_API_KEY
+const openaiCompatible = (process.env.OPENAI_COMPATIBLE_BASE_URL?.trim() && process.env.OPENAI_COMPATIBLE_API_KEY?.trim())
   ? createOpenAI({
-      apiKey: process.env.OPENAI_COMPATIBLE_API_KEY,
-      baseURL: process.env.OPENAI_COMPATIBLE_BASE_URL,
+      apiKey: process.env.OPENAI_COMPATIBLE_API_KEY.trim(),
+      baseURL: process.env.OPENAI_COMPATIBLE_BASE_URL.trim(),
     })
   : null;
 
 export async function POST(req: Request) {
   try {
     // Validate OpenAI-compatible configuration if provided
-    if (process.env.OPENAI_COMPATIBLE_BASE_URL) {
-      if (!process.env.OPENAI_COMPATIBLE_API_KEY) {
+    const baseUrl = process.env.OPENAI_COMPATIBLE_BASE_URL?.trim();
+    const apiKey = process.env.OPENAI_COMPATIBLE_API_KEY?.trim();
+    const model = process.env.OPENAI_COMPATIBLE_MODEL?.trim();
+    
+    if (baseUrl) {
+      if (!apiKey) {
         console.error('OPENAI_COMPATIBLE_BASE_URL is set but OPENAI_COMPATIBLE_API_KEY is missing');
         return Response.json(
           { error: 'OpenAI-compatible API is misconfigured: API key is required when base URL is set' },
           { status: 500 }
         );
       }
-      if (!process.env.OPENAI_COMPATIBLE_MODEL) {
+      if (!model) {
         console.error('OPENAI_COMPATIBLE_BASE_URL is set but OPENAI_COMPATIBLE_MODEL is missing');
         return Response.json(
           { error: 'OpenAI-compatible API is misconfigured: Model name is required when base URL is set' },
@@ -41,7 +45,7 @@ export async function POST(req: Request) {
       
       // Validate base URL format
       try {
-        new URL(process.env.OPENAI_COMPATIBLE_BASE_URL);
+        new URL(baseUrl);
       } catch {
         console.error('Invalid OPENAI_COMPATIBLE_BASE_URL format:', process.env.OPENAI_COMPATIBLE_BASE_URL);
         return Response.json(
@@ -162,17 +166,17 @@ ${lastMessageText}
     console.log("Enhanced messages:", enhancedMessages);
 
     // Determine which model to use
-    const useOpenAICompatible = openaiCompatible && process.env.OPENAI_COMPATIBLE_MODEL;
+    const useOpenAICompatible = openaiCompatible && model;
     
     // Log which provider is being used
     if (useOpenAICompatible) {
-      console.log(`Using OpenAI-compatible provider: ${process.env.OPENAI_COMPATIBLE_BASE_URL} with model: ${process.env.OPENAI_COMPATIBLE_MODEL}`);
+      console.log(`Using OpenAI-compatible provider: ${baseUrl} with model: ${model}`);
     } else {
       console.log('Using AWS Bedrock provider with Claude Sonnet 4.5');
     }
     
     const selectedModel = useOpenAICompatible 
-      ? openaiCompatible.chat(process.env.OPENAI_COMPATIBLE_MODEL!)
+      ? openaiCompatible.chat(model!)
       : bedrock('global.anthropic.claude-sonnet-4-5-20250929-v1:0');
 
     // Prepare provider options
@@ -267,7 +271,7 @@ IMPORTANT: Keep edits concise:
         const errorObj = error as any;
         if (errorObj.statusCode === 404) {
           const provider = useOpenAICompatible 
-            ? `OpenAI-compatible endpoint (${process.env.OPENAI_COMPATIBLE_BASE_URL})`
+            ? `OpenAI-compatible endpoint (${baseUrl})`
             : 'AWS Bedrock';
           return `API endpoint not found (404) when calling ${provider}. Please check your API configuration and ensure the endpoint URL is correct.`;
         }

@@ -12,16 +12,17 @@ import { replaceXMLParts } from "@/lib/utils";
 export const maxDuration = 60
 const openrouter = createOpenRouter({ apiKey: process.env.OPENROUTER_API_KEY });
 
-// Helper function to clean URL (remove quotes and trim)
-function cleanUrl(url: string | undefined): string | undefined {
-  return url?.trim().replace(/^["']|["']$/g, '');
+// Helper function to clean environment variable strings (remove quotes and trim)
+function cleanEnvVar(value: string | undefined): string | undefined {
+  return value?.trim().replace(/^["']|["']$/g, '');
 }
 
 // Initialize OpenAI compatible provider if configured
-const cleanBaseUrl = cleanUrl(process.env.OPENAI_COMPATIBLE_BASE_URL);
-const openaiCompatible = (cleanBaseUrl && process.env.OPENAI_COMPATIBLE_API_KEY?.trim())
+const cleanBaseUrl = cleanEnvVar(process.env.OPENAI_COMPATIBLE_BASE_URL);
+const cleanApiKey = cleanEnvVar(process.env.OPENAI_COMPATIBLE_API_KEY);
+const openaiCompatible = (cleanBaseUrl && cleanApiKey)
   ? createOpenAI({
-      apiKey: process.env.OPENAI_COMPATIBLE_API_KEY.trim(),
+      apiKey: cleanApiKey,
       baseURL: cleanBaseUrl,
     })
   : null;
@@ -30,15 +31,21 @@ export async function POST(req: Request) {
   try {
     // Validate OpenAI-compatible configuration if provided
     const rawBaseUrl = process.env.OPENAI_COMPATIBLE_BASE_URL;
-    const baseUrl = cleanUrl(rawBaseUrl);
-    const apiKey = process.env.OPENAI_COMPATIBLE_API_KEY?.trim();
-    const model = process.env.OPENAI_COMPATIBLE_MODEL?.trim();
+    const rawApiKey = process.env.OPENAI_COMPATIBLE_API_KEY;
+    const rawModel = process.env.OPENAI_COMPATIBLE_MODEL;
+    
+    const baseUrl = cleanEnvVar(rawBaseUrl);
+    const apiKey = cleanEnvVar(rawApiKey);
+    const model = cleanEnvVar(rawModel);
     
     if (baseUrl) {
       console.log('OpenAI-compatible configuration detected');
       console.log('Raw base URL:', JSON.stringify(rawBaseUrl));
       console.log('Processed base URL:', JSON.stringify(baseUrl));
       console.log('Base URL length:', baseUrl.length);
+      console.log('Raw model name:', JSON.stringify(rawModel));
+      console.log('Processed model name:', JSON.stringify(model));
+      console.log('Model name length:', model?.length);
       
       if (!apiKey) {
         console.error('OPENAI_COMPATIBLE_BASE_URL is set but OPENAI_COMPATIBLE_API_KEY is missing');

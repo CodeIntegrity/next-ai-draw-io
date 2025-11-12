@@ -29,6 +29,7 @@ const openaiCompatible = (cleanBaseUrl && cleanApiKey)
         console.log('=== Outgoing API Request ===');
         console.log('URL:', url);
         console.log('Method:', init?.method);
+        console.log('Headers:', JSON.stringify(init?.headers, null, 2));
         
         // Parse and log request body if present
         if (init?.body) {
@@ -41,6 +42,7 @@ const openaiCompatible = (cleanBaseUrl && cleanApiKey)
               messages: bodyJson.messages?.length,
               temperature: bodyJson.temperature,
             });
+            console.log('Full request body:', JSON.stringify(bodyJson, null, 2));
             console.log('Stream parameter set to:', bodyJson.stream);
           } catch (e) {
             console.log('Request body (raw):', init.body);
@@ -48,13 +50,48 @@ const openaiCompatible = (cleanBaseUrl && cleanApiKey)
         }
         
         // Make the actual fetch request
-        const response = await fetch(url, init);
+        console.log('Making fetch request...');
+        let response: Response;
+        try {
+          response = await fetch(url, init);
+        } catch (fetchError) {
+          console.error('=== Fetch Error ===');
+          console.error('Failed to connect to API:', fetchError);
+          throw fetchError;
+        }
         
         // Log the response details
         console.log('=== API Response Received ===');
         console.log('Status:', response.status, response.statusText);
         console.log('Content-Type:', response.headers.get('content-type'));
         console.log('Transfer-Encoding:', response.headers.get('transfer-encoding'));
+        
+        // Log all response headers
+        console.log('All Response Headers:');
+        response.headers.forEach((value, key) => {
+          console.log(`  ${key}: ${value}`);
+        });
+        
+        // Check if this is an error response
+        if (!response.ok) {
+          console.error('=== Error Response ===');
+          console.error('Status:', response.status, response.statusText);
+          
+          // Try to read and log the error body
+          try {
+            const errorText = await response.text();
+            console.error('Error body:', errorText);
+            
+            // Create a new response with the same error
+            return new Response(errorText, {
+              status: response.status,
+              statusText: response.statusText,
+              headers: response.headers,
+            });
+          } catch (readError) {
+            console.error('Failed to read error body:', readError);
+          }
+        }
         
         // Check if this is a streaming response
         const isStreaming = response.headers.get('content-type')?.includes('text/event-stream') || 
@@ -63,6 +100,60 @@ const openaiCompatible = (cleanBaseUrl && cleanApiKey)
         
         if (isStreaming) {
           console.log('✓ Streaming response detected - processing SSE stream');
+          
+          // Wrap the response to log chunks
+          const originalBody = response.body;
+          if (originalBody) {
+            const reader = originalBody.getReader();
+            let chunkCount = 0;
+            
+            const stream = new ReadableStream({
+              async start(controller) {
+                console.log('Stream reading started');
+                try {
+                  while (true) {
+                    const { done, value } = await reader.read();
+                    
+                    if (done) {
+                      console.log(`Stream complete. Total chunks: ${chunkCount}`);
+                      controller.close();
+                      break;
+                    }
+                    
+                    chunkCount++;
+                    const text = new TextDecoder().decode(value);
+                    console.log(`Chunk ${chunkCount}:`, text.substring(0, 200) + (text.length > 200 ? '...' : ''));
+                    
+                    controller.enqueue(value);
+                  }
+                } catch (error) {
+                  console.error('Stream reading error:', error);
+                  controller.error(error);
+                }
+              }
+            });
+            
+            return new Response(stream, {
+              status: response.status,
+              statusText: response.statusText,
+              headers: response.headers,
+            });
+          }
+        } else {
+          console.log('Non-streaming response - reading body...');
+          try {
+            const bodyText = await response.text();
+            console.log('Response body:', bodyText.substring(0, 500) + (bodyText.length > 500 ? '...' : ''));
+            
+            // Create a new response with the body we just read
+            return new Response(bodyText, {
+              status: response.status,
+              statusText: response.statusText,
+              headers: response.headers,
+            });
+          } catch (readError) {
+            console.error('Failed to read response body:', readError);
+          }
         }
         
         return response;
@@ -274,10 +365,15 @@ ${lastMessageText}
     if (useOpenAICompatible) {
       console.log('Model:', model);
       console.log('Base URL:', baseUrl);
+      console.log('API Key (first 10 chars):', cleanApiKey?.substring(0, 10) + '...');
     }
     console.log('Messages count:', enhancedMessages.length);
-
-    const result = streamText({
+    console.log('First message:', JSON.stringify(enhancedMessages[0], null, 2).substring(0, 300) + '...');
+    
+    let result;
+    try {
+      console.log('Calling streamText()...');
+      result = streamText({
       // model: google("gemini-2.5-flash-preview-05-20"),
       // model: google("gemini-2.5-pro"),
       // model: bedrock('anthropic.claude-sonnet-4-20250514-v1:0'),
@@ -336,6 +432,13 @@ IMPORTANT: Keep edits concise:
       },
       temperature: 0,
     });
+      console.log('✓ streamText() called successfully');
+      console.log('Result object type:', typeof result);
+    } catch (streamTextError) {
+      console.error('=== streamText() Error ===');
+      console.error('Error calling streamText():', streamTextError);
+      throw streamTextError;
+    }
 
     // Error handler function to provide detailed error messages
     function errorHandler(error: unknown) {
@@ -375,9 +478,20 @@ IMPORTANT: Keep edits concise:
     console.log('=== Preparing to stream response ===');
     console.log('Converting streamText result to UI message stream response');
 
-    const response = result.toUIMessageStreamResponse({
-      onError: errorHandler,
-    });
+    let response;
+    try {
+      response = result.toUIMessageStreamResponse({
+        onError: errorHandler,
+      });
+      console.log('✓ toUIMessageStreamResponse() called successfully');
+      console.log('Response type:', typeof response);
+      console.log('Response headers:', response.headers);
+      console.log('Response status:', response.status);
+    } catch (responseError) {
+      console.error('=== toUIMessageStreamResponse() Error ===');
+      console.error('Error converting to response:', responseError);
+      throw responseError;
+    }
 
     console.log('✓ Stream response prepared and returning to client');
     

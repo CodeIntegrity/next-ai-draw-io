@@ -99,6 +99,10 @@ Check out the [Next.js deployment documentation](https://nextjs.org/docs/app/bui
 Or you can deploy by this button.
 [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FDayuanJiang%2Fnext-ai-draw-io)
 
+### Docker 部署（中文）
+
+参阅 [`DEPLOY_DOCKER_ZH.md`](./DEPLOY_DOCKER_ZH.md) 获取使用容器镜像部署应用的详细步骤。
+
 ## Project Structure
 
 ```

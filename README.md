@@ -55,6 +55,25 @@ Then update `.env.local` with your actual API keys:
 
 Note: Not all variables are required. At minimum, you'll need at least one AI provider API key (OpenAI, Google, or OpenRouter).
 
+### OpenAI-Compatible API Configuration
+
+If you want to use an OpenAI-compatible API endpoint (such as a self-hosted model or third-party compatible service), configure these variables:
+
+```bash
+OPENAI_COMPATIBLE_BASE_URL="https://your-api-endpoint.com/v1"
+OPENAI_COMPATIBLE_MODEL="your-model-name"
+OPENAI_COMPATIBLE_API_KEY="your-api-key"
+OPENAI_COMPATIBLE_TIMEOUT="60000"  # Optional, default timeout in milliseconds
+```
+
+**Important Notes:**
+- All three variables (`BASE_URL`, `MODEL`, and `API_KEY`) must be set together for the OpenAI-compatible provider to work
+- The `BASE_URL` should point to the base URL of your API (typically ending in `/v1`)
+- The application will automatically append the correct path (`/chat/completions`) to the base URL
+- If the OpenAI-compatible configuration is present, it will be used instead of AWS Bedrock
+- Make sure your endpoint is accessible and returns responses in OpenAI's format
+- If you see 404 errors, verify your base URL is correct and the endpoint is properly deployed
+
 4. Run the development server:
 
 ```bash
@@ -85,6 +104,34 @@ lib/                  # Utility functions and helpers
   utils.ts            # General utilities including XML conversion
 public/               # Static assets including example images
 ```
+
+## Troubleshooting
+
+### 404 Error with OpenAI-Compatible API
+
+If you encounter a 404 error when using an OpenAI-compatible API endpoint:
+
+1. **Verify the Base URL**: Ensure `OPENAI_COMPATIBLE_BASE_URL` is correct and accessible
+   - The URL should typically end with `/v1` (e.g., `https://api.example.com/v1`)
+   - Test the endpoint is reachable: `curl https://your-api-endpoint.com/v1/models`
+
+2. **Check All Required Variables**: All three variables must be set:
+   - `OPENAI_COMPATIBLE_BASE_URL`
+   - `OPENAI_COMPATIBLE_MODEL`
+   - `OPENAI_COMPATIBLE_API_KEY`
+
+3. **Verify API Compatibility**: The endpoint must support OpenAI's API format
+   - It should accept requests to `/v1/chat/completions`
+   - It should return responses in OpenAI's format
+
+4. **Check Deployment Environment**: If the app works locally but fails in deployment:
+   - Verify environment variables are set correctly in your deployment platform
+   - Check if your API endpoint is accessible from your deployment environment
+   - Review deployment logs for configuration errors
+
+5. **Fallback to Default Provider**: If you continue to have issues:
+   - Remove or comment out the `OPENAI_COMPATIBLE_*` environment variables
+   - The app will automatically fall back to AWS Bedrock
 
 ## TODOs
 

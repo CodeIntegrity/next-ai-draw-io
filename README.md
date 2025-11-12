@@ -126,17 +126,49 @@ public/               # Static assets including example images
 If you're experiencing issues with streaming responses (no response, delayed response, or interrupted streams):
 
 1. **Enable Debug Logging**: Check both server logs and browser console for detailed streaming logs
-2. **Test the API Directly**: Use the provided test script:
+2. **Test the API Directly**: Use the provided test scripts:
    ```bash
+   # For SiliconFlow
    node test-siliconflow-stream.js
+   
+   # For newapi
+   node test-newapi-basic.js    # Test basic connectivity
+   node test-newapi-stream.js   # Test streaming
    ```
-3. **Review the Streaming Debug Guide**: See [`STREAMING_DEBUG_GUIDE.md`](./STREAMING_DEBUG_GUIDE.md) for comprehensive debugging steps
+3. **Review the Debug Guides**: 
+   - General streaming: [`STREAMING_DEBUG_GUIDE.md`](./STREAMING_DEBUG_GUIDE.md)
+   - newapi specific: [`NEWAPI_DEBUG_GUIDE.md`](./NEWAPI_DEBUG_GUIDE.md)
 
 The application includes extensive logging to trace the complete streaming pipeline:
 - Request sent with `stream: true` parameter
 - Response received with SSE format
 - Each chunk processed and forwarded to client
 - Stream completion or errors
+
+### newapi Integration
+
+If you're using newapi (https://api.newapi.com/v1) and experiencing no response issues:
+
+1. **Verify Configuration**: Ensure all environment variables are set correctly:
+   ```bash
+   OPENAI_COMPATIBLE_BASE_URL=https://api.newapi.com/v1
+   OPENAI_COMPATIBLE_MODEL=gpt-4o-mini
+   OPENAI_COMPATIBLE_API_KEY=your-api-key
+   ```
+
+2. **Test Connectivity**: Run the test scripts to verify the API is accessible:
+   ```bash
+   node test-newapi-basic.js     # Test basic API call
+   node test-newapi-stream.js    # Test streaming specifically
+   ```
+
+3. **Check Logs**: The enhanced logging will show:
+   - Outgoing request details (URL, headers, body)
+   - Response status and headers
+   - Each streaming chunk received
+   - Any errors encountered
+
+4. **Follow the Debug Guide**: See [`NEWAPI_DEBUG_GUIDE.md`](./NEWAPI_DEBUG_GUIDE.md) for step-by-step debugging instructions
 
 ### 404 Error with OpenAI-Compatible API
 

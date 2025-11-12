@@ -121,6 +121,23 @@ public/               # Static assets including example images
 
 ## Troubleshooting
 
+### Streaming Issues
+
+If you're experiencing issues with streaming responses (no response, delayed response, or interrupted streams):
+
+1. **Enable Debug Logging**: Check both server logs and browser console for detailed streaming logs
+2. **Test the API Directly**: Use the provided test script:
+   ```bash
+   node test-siliconflow-stream.js
+   ```
+3. **Review the Streaming Debug Guide**: See [`STREAMING_DEBUG_GUIDE.md`](./STREAMING_DEBUG_GUIDE.md) for comprehensive debugging steps
+
+The application includes extensive logging to trace the complete streaming pipeline:
+- Request sent with `stream: true` parameter
+- Response received with SSE format
+- Each chunk processed and forwarded to client
+- Stream completion or errors
+
 ### 404 Error with OpenAI-Compatible API
 
 If you encounter a 404 error when using an OpenAI-compatible API endpoint:

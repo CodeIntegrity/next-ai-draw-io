@@ -66,10 +66,18 @@ OPENAI_COMPATIBLE_API_KEY="your-api-key"
 OPENAI_COMPATIBLE_TIMEOUT="60000"  # Optional, default timeout in milliseconds
 ```
 
+**重要说明：**
+- 必须同时设置这三个变量（`BASE_URL`、`MODEL` 和 `API_KEY`）才能使 OpenAI 兼容提供商正常工作
+- `BASE_URL` 应该指向你的 API 的基础 URL（通常以 `/v1` 结尾）
+- 应用程序会自动使用传统的 `/chat/completions` 端点（而非新版的 `/responses` 端点），以确保与更多 OpenAI 兼容 API（如 SiliconFlow、DeepSeek 等）的兼容性
+- 如果配置了 OpenAI 兼容选项，将优先使用该配置而非 AWS Bedrock
+- 请确保你的端点可访问且返回 OpenAI 格式的响应
+- 如果遇到 404 错误，请验证你的基础 URL 是否正确以及端点是否已正确部署
+
 **Important Notes:**
 - All three variables (`BASE_URL`, `MODEL`, and `API_KEY`) must be set together for the OpenAI-compatible provider to work
 - The `BASE_URL` should point to the base URL of your API (typically ending in `/v1`)
-- The application will automatically append the correct path (`/chat/completions`) to the base URL
+- The application uses the traditional `/chat/completions` endpoint (not the newer `/responses` endpoint) to ensure compatibility with more OpenAI-compatible APIs (such as SiliconFlow, DeepSeek, etc.)
 - If the OpenAI-compatible configuration is present, it will be used instead of AWS Bedrock
 - Make sure your endpoint is accessible and returns responses in OpenAI's format
 - If you see 404 errors, verify your base URL is correct and the endpoint is properly deployed

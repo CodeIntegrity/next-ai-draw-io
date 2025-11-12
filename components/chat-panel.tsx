@@ -63,6 +63,10 @@ export default function ChatPanel() {
             transport: new DefaultChatTransport({
                 api: "/api/chat",
             }),
+            onFinish: (message) => {
+                console.log('=== Stream Finished ===');
+                console.log('Final message:', message);
+            },
             async onToolCall({ toolCall }) {
                 if (toolCall.toolName === "display_diagram") {
                     // Diagram is handled streamingly in the ChatMessageDisplay component
@@ -111,6 +115,18 @@ export default function ChatPanel() {
             },
         });
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    
+    // Track status changes
+    useEffect(() => {
+        console.log('=== Chat Status Changed ===');
+        console.log('Status:', status);
+        if (status === 'submitted') {
+            console.log('✓ Request submitted, waiting for response');
+        } else if (status === 'ready') {
+            console.log('✓ Ready - awaiting user message');
+        }
+    }, [status]);
+    
     // Scroll to bottom when messages change
     useEffect(() => {
         if (messagesEndRef.current) {
@@ -120,8 +136,12 @@ export default function ChatPanel() {
 
     const onFormSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
-        if (input.trim() && status !== "streaming") {
+        if (input.trim() && status !== "submitted") {
             try {
+                console.log('=== Sending Message ===');
+                console.log('Input:', input);
+                console.log('Files attached:', files.length);
+                
                 // Fetch chart data before sending message
                 let chartXml = await onFetchChart();
 
@@ -149,6 +169,7 @@ export default function ChatPanel() {
                     }
                 }
 
+                console.log('Sending message to API...');
                 sendMessage(
                     { parts },
                     {
@@ -158,10 +179,13 @@ export default function ChatPanel() {
                     }
                 );
 
+                console.log('✓ Message sent, waiting for stream...');
+
                 // Clear input and files after submission
                 setInput("");
                 setFiles([]);
             } catch (error) {
+                console.error("=== Error Sending Message ===");
                 console.error("Error fetching chart data:", error);
             }
         }

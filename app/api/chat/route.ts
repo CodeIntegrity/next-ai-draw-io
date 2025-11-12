@@ -24,6 +24,49 @@ const openaiCompatible = (cleanBaseUrl && cleanApiKey)
   ? createOpenAI({
       apiKey: cleanApiKey,
       baseURL: cleanBaseUrl,
+      fetch: async (url, init) => {
+        // Log the outgoing request for debugging
+        console.log('=== Outgoing API Request ===');
+        console.log('URL:', url);
+        console.log('Method:', init?.method);
+        
+        // Parse and log request body if present
+        if (init?.body) {
+          try {
+            const bodyStr = typeof init.body === 'string' ? init.body : new TextDecoder().decode(init.body as ArrayBuffer);
+            const bodyJson = JSON.parse(bodyStr);
+            console.log('Request Body:', {
+              model: bodyJson.model,
+              stream: bodyJson.stream,
+              messages: bodyJson.messages?.length,
+              temperature: bodyJson.temperature,
+            });
+            console.log('Stream parameter set to:', bodyJson.stream);
+          } catch (e) {
+            console.log('Request body (raw):', init.body);
+          }
+        }
+        
+        // Make the actual fetch request
+        const response = await fetch(url, init);
+        
+        // Log the response details
+        console.log('=== API Response Received ===');
+        console.log('Status:', response.status, response.statusText);
+        console.log('Content-Type:', response.headers.get('content-type'));
+        console.log('Transfer-Encoding:', response.headers.get('transfer-encoding'));
+        
+        // Check if this is a streaming response
+        const isStreaming = response.headers.get('content-type')?.includes('text/event-stream') || 
+                           response.headers.get('transfer-encoding')?.includes('chunked');
+        console.log('Is streaming response:', isStreaming);
+        
+        if (isStreaming) {
+          console.log('✓ Streaming response detected - processing SSE stream');
+        }
+        
+        return response;
+      },
     })
   : null;
 
@@ -226,6 +269,14 @@ ${lastMessageText}
       ? AbortSignal.timeout(parseInt(process.env.OPENAI_COMPATIBLE_TIMEOUT, 10))
       : undefined;
 
+    console.log('=== Starting streamText call ===');
+    console.log('Provider:', useOpenAICompatible ? 'OpenAI-compatible' : 'AWS Bedrock');
+    if (useOpenAICompatible) {
+      console.log('Model:', model);
+      console.log('Base URL:', baseUrl);
+    }
+    console.log('Messages count:', enhancedMessages.length);
+
     const result = streamText({
       // model: google("gemini-2.5-flash-preview-05-20"),
       // model: google("gemini-2.5-pro"),
@@ -288,6 +339,8 @@ IMPORTANT: Keep edits concise:
 
     // Error handler function to provide detailed error messages
     function errorHandler(error: unknown) {
+      console.error('=== Stream Error Occurred ===');
+      console.error('Error type:', typeof error);
       console.error('Stream error details:', error);
       
       if (error == null) {
@@ -299,6 +352,9 @@ IMPORTANT: Keep edits concise:
       }
 
       if (error instanceof Error) {
+        console.error('Error message:', error.message);
+        console.error('Error stack:', error.stack);
+        
         // Check if it's an API error with additional context
         const errorObj = error as any;
         if (errorObj.statusCode === 404) {
@@ -316,11 +372,24 @@ IMPORTANT: Keep edits concise:
       return JSON.stringify(error);
     }
 
-    return result.toUIMessageStreamResponse({
+    console.log('=== Preparing to stream response ===');
+    console.log('Converting streamText result to UI message stream response');
+
+    const response = result.toUIMessageStreamResponse({
       onError: errorHandler,
     });
+
+    console.log('✓ Stream response prepared and returning to client');
+    
+    return response;
   } catch (error) {
-    console.error('Error in chat route:', error);
+    console.error('=== Fatal Error in Chat Route ===');
+    console.error('Error type:', typeof error);
+    console.error('Error details:', error);
+    if (error instanceof Error) {
+      console.error('Error message:', error.message);
+      console.error('Error stack:', error.stack);
+    }
     return Response.json(
       { error: 'Internal server error' },
       { status: 500 }

@@ -12,6 +12,14 @@ import { replaceXMLParts } from "@/lib/utils";
 export const maxDuration = 60
 const openrouter = createOpenRouter({ apiKey: process.env.OPENROUTER_API_KEY });
 
+// Initialize OpenAI compatible provider if configured
+const openaiCompatible = process.env.OPENAI_COMPATIBLE_BASE_URL 
+  ? createOpenAI({
+      apiKey: process.env.OPENAI_COMPATIBLE_API_KEY,
+      baseURL: process.env.OPENAI_COMPATIBLE_BASE_URL,
+    })
+  : null;
+
 export async function POST(req: Request) {
   try {
     const { messages, xml } = await req.json();
@@ -124,12 +132,33 @@ ${lastMessageText}
 
     console.log("Enhanced messages:", enhancedMessages);
 
+    // Determine which model to use
+    const useOpenAICompatible = openaiCompatible && process.env.OPENAI_COMPATIBLE_MODEL;
+    const selectedModel = useOpenAICompatible 
+      ? openaiCompatible(process.env.OPENAI_COMPATIBLE_MODEL!)
+      : bedrock('global.anthropic.claude-sonnet-4-5-20250929-v1:0');
+
+    // Prepare provider options
+    const providerOptions: any = {};
+    if (!useOpenAICompatible) {
+      providerOptions.anthropic = {
+        additionalModelRequestFields: {
+          anthropic_beta: ['fine-grained-tool-streaming-2025-05-14']
+        }
+      };
+    }
+
+    // Add timeout if specified for OpenAI compatible API
+    const abortSignal = useOpenAICompatible && process.env.OPENAI_COMPATIBLE_TIMEOUT
+      ? AbortSignal.timeout(parseInt(process.env.OPENAI_COMPATIBLE_TIMEOUT, 10))
+      : undefined;
+
     const result = streamText({
       // model: google("gemini-2.5-flash-preview-05-20"),
       // model: google("gemini-2.5-pro"),
       // model: bedrock('anthropic.claude-sonnet-4-20250514-v1:0'),
       system: systemMessage,
-      model: bedrock('global.anthropic.claude-sonnet-4-5-20250929-v1:0'),
+      model: selectedModel,
       // model: openrouter('moonshotai/kimi-k2:free'),
       // model: model,
       // providerOptions: {
@@ -144,13 +173,8 @@ ${lastMessageText}
       //     reasoningEffort: "minimal"
       //   },
       // },
-      providerOptions: {
-        anthropic: {
-          additionalModelRequestFields: {
-            anthropic_beta: ['fine-grained-tool-streaming-2025-05-14']
-          }
-        }
-      },
+      ...(Object.keys(providerOptions).length > 0 && { providerOptions }),
+      ...(abortSignal && { abortSignal }),
       messages: enhancedMessages,
       tools: {
         // Client-side tool that will be executed on the client

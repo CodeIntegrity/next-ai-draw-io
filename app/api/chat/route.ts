@@ -172,7 +172,7 @@ ${lastMessageText}
     }
     
     const selectedModel = useOpenAICompatible 
-      ? openaiCompatible(process.env.OPENAI_COMPATIBLE_MODEL!)
+      ? openaiCompatible.chat(process.env.OPENAI_COMPATIBLE_MODEL!)
       : bedrock('global.anthropic.claude-sonnet-4-5-20250929-v1:0');
 
     // Prepare provider options

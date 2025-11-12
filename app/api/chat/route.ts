@@ -12,22 +12,34 @@ import { replaceXMLParts } from "@/lib/utils";
 export const maxDuration = 60
 const openrouter = createOpenRouter({ apiKey: process.env.OPENROUTER_API_KEY });
 
+// Helper function to clean URL (remove quotes and trim)
+function cleanUrl(url: string | undefined): string | undefined {
+  return url?.trim().replace(/^["']|["']$/g, '');
+}
+
 // Initialize OpenAI compatible provider if configured
-const openaiCompatible = (process.env.OPENAI_COMPATIBLE_BASE_URL?.trim() && process.env.OPENAI_COMPATIBLE_API_KEY?.trim())
+const cleanBaseUrl = cleanUrl(process.env.OPENAI_COMPATIBLE_BASE_URL);
+const openaiCompatible = (cleanBaseUrl && process.env.OPENAI_COMPATIBLE_API_KEY?.trim())
   ? createOpenAI({
       apiKey: process.env.OPENAI_COMPATIBLE_API_KEY.trim(),
-      baseURL: process.env.OPENAI_COMPATIBLE_BASE_URL.trim(),
+      baseURL: cleanBaseUrl,
     })
   : null;
 
 export async function POST(req: Request) {
   try {
     // Validate OpenAI-compatible configuration if provided
-    const baseUrl = process.env.OPENAI_COMPATIBLE_BASE_URL?.trim();
+    const rawBaseUrl = process.env.OPENAI_COMPATIBLE_BASE_URL;
+    const baseUrl = cleanUrl(rawBaseUrl);
     const apiKey = process.env.OPENAI_COMPATIBLE_API_KEY?.trim();
     const model = process.env.OPENAI_COMPATIBLE_MODEL?.trim();
     
     if (baseUrl) {
+      console.log('OpenAI-compatible configuration detected');
+      console.log('Raw base URL:', JSON.stringify(rawBaseUrl));
+      console.log('Processed base URL:', JSON.stringify(baseUrl));
+      console.log('Base URL length:', baseUrl.length);
+      
       if (!apiKey) {
         console.error('OPENAI_COMPATIBLE_BASE_URL is set but OPENAI_COMPATIBLE_API_KEY is missing');
         return Response.json(
@@ -45,11 +57,24 @@ export async function POST(req: Request) {
       
       // Validate base URL format
       try {
-        new URL(baseUrl);
-      } catch {
-        console.error('Invalid OPENAI_COMPATIBLE_BASE_URL format:', process.env.OPENAI_COMPATIBLE_BASE_URL);
+        const urlObj = new URL(baseUrl);
+        console.log('URL validation successful:', {
+          protocol: urlObj.protocol,
+          hostname: urlObj.hostname,
+          pathname: urlObj.pathname
+        });
+        
+        // Additional validation: ensure it's http or https
+        if (!urlObj.protocol.match(/^https?:$/)) {
+          throw new Error('URL must use HTTP or HTTPS protocol');
+        }
+      } catch (error) {
+        console.error('Invalid OPENAI_COMPATIBLE_BASE_URL format');
+        console.error('Raw value:', JSON.stringify(rawBaseUrl));
+        console.error('Processed value:', JSON.stringify(baseUrl));
+        console.error('Error details:', error);
         return Response.json(
-          { error: 'OpenAI-compatible API is misconfigured: Invalid base URL format' },
+          { error: `OpenAI-compatible API is misconfigured: Invalid base URL format - ${error instanceof Error ? error.message : 'Invalid URL'}` },
           { status: 500 }
         );
       }

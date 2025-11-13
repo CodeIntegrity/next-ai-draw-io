@@ -8,6 +8,7 @@ import { createOpenAI } from '@ai-sdk/openai';
 
 import { z } from "zod/v3";
 import { replaceXMLParts } from "@/lib/utils";
+import { logger } from "@/lib/logger";
 
 export const maxDuration = 60
 const openrouter = createOpenRouter({ apiKey: process.env.OPENROUTER_API_KEY });
@@ -26,61 +27,61 @@ const openaiCompatible = (cleanBaseUrl && cleanApiKey)
       baseURL: cleanBaseUrl,
       fetch: async (url, init) => {
         // Log the outgoing request for debugging
-        console.log('=== Outgoing API Request ===');
-        console.log('URL:', url);
-        console.log('Method:', init?.method);
-        console.log('Headers:', JSON.stringify(init?.headers, null, 2));
+        logger.debug('=== Outgoing API Request ===');
+        logger.debug('URL:', url);
+        logger.debug('Method:', init?.method);
+        logger.debug('Headers:', JSON.stringify(init?.headers, null, 2));
         
         // Parse and log request body if present
         if (init?.body) {
           try {
             const bodyStr = typeof init.body === 'string' ? init.body : new TextDecoder().decode(init.body as ArrayBuffer);
             const bodyJson = JSON.parse(bodyStr);
-            console.log('Request Body:', {
+            logger.debug('Request Body:', {
               model: bodyJson.model,
               stream: bodyJson.stream,
               messages: bodyJson.messages?.length,
               temperature: bodyJson.temperature,
             });
-            console.log('Full request body:', JSON.stringify(bodyJson, null, 2));
-            console.log('Stream parameter set to:', bodyJson.stream);
+            logger.debug('Full request body:', JSON.stringify(bodyJson, null, 2));
+            logger.debug('Stream parameter set to:', bodyJson.stream);
           } catch (e) {
-            console.log('Request body (raw):', init.body);
+            logger.debug('Request body (raw):', init.body);
           }
         }
         
         // Make the actual fetch request
-        console.log('Making fetch request...');
+        logger.debug('Making fetch request...');
         let response: Response;
         try {
           response = await fetch(url, init);
         } catch (fetchError) {
-          console.error('=== Fetch Error ===');
-          console.error('Failed to connect to API:', fetchError);
+          logger.error('=== Fetch Error ===');
+          logger.error('Failed to connect to API:', fetchError);
           throw fetchError;
         }
         
         // Log the response details
-        console.log('=== API Response Received ===');
-        console.log('Status:', response.status, response.statusText);
-        console.log('Content-Type:', response.headers.get('content-type'));
-        console.log('Transfer-Encoding:', response.headers.get('transfer-encoding'));
+        logger.debug('=== API Response Received ===');
+        logger.debug('Status:', response.status, response.statusText);
+        logger.debug('Content-Type:', response.headers.get('content-type'));
+        logger.debug('Transfer-Encoding:', response.headers.get('transfer-encoding'));
         
         // Log all response headers
-        console.log('All Response Headers:');
+        logger.debug('All Response Headers:');
         response.headers.forEach((value, key) => {
-          console.log(`  ${key}: ${value}`);
+          logger.debug(`  ${key}: ${value}`);
         });
         
         // Check if this is an error response
         if (!response.ok) {
-          console.error('=== Error Response ===');
-          console.error('Status:', response.status, response.statusText);
+          logger.error('=== Error Response ===');
+          logger.error('Status:', response.status, response.statusText);
           
           // Try to read and log the error body
           try {
             const errorText = await response.text();
-            console.error('Error body:', errorText);
+            logger.error('Error body:', errorText);
             
             // Create a new response with the same error
             return new Response(errorText, {
@@ -89,17 +90,17 @@ const openaiCompatible = (cleanBaseUrl && cleanApiKey)
               headers: response.headers,
             });
           } catch (readError) {
-            console.error('Failed to read error body:', readError);
+            logger.error('Failed to read error body:', readError);
           }
         }
         
         // Check if this is a streaming response
         const isStreaming = response.headers.get('content-type')?.includes('text/event-stream') || 
                            response.headers.get('transfer-encoding')?.includes('chunked');
-        console.log('Is streaming response:', isStreaming);
+        logger.debug('Is streaming response:', isStreaming);
         
         if (isStreaming) {
-          console.log('✓ Streaming response detected - processing SSE stream');
+          logger.info('✓ Streaming response detected - processing SSE stream');
           
           // Wrap the response to log chunks
           const originalBody = response.body;
@@ -109,25 +110,25 @@ const openaiCompatible = (cleanBaseUrl && cleanApiKey)
             
             const stream = new ReadableStream({
               async start(controller) {
-                console.log('Stream reading started');
+                logger.debug('Stream reading started');
                 try {
                   while (true) {
                     const { done, value } = await reader.read();
                     
                     if (done) {
-                      console.log(`Stream complete. Total chunks: ${chunkCount}`);
+                      logger.info(`Stream complete. Total chunks: ${chunkCount}`);
                       controller.close();
                       break;
                     }
                     
                     chunkCount++;
                     const text = new TextDecoder().decode(value);
-                    console.log(`Chunk ${chunkCount}:`, text.substring(0, 200) + (text.length > 200 ? '...' : ''));
+                    logger.debug(`Chunk ${chunkCount}:`, text.substring(0, 200) + (text.length > 200 ? '...' : ''));
                     
                     controller.enqueue(value);
                   }
                 } catch (error) {
-                  console.error('Stream reading error:', error);
+                  logger.error('Stream reading error:', error);
                   controller.error(error);
                 }
               }
@@ -140,10 +141,10 @@ const openaiCompatible = (cleanBaseUrl && cleanApiKey)
             });
           }
         } else {
-          console.log('Non-streaming response - reading body...');
+          logger.debug('Non-streaming response - reading body...');
           try {
             const bodyText = await response.text();
-            console.log('Response body:', bodyText.substring(0, 500) + (bodyText.length > 500 ? '...' : ''));
+            logger.debug('Response body:', bodyText.substring(0, 500) + (bodyText.length > 500 ? '...' : ''));
             
             // Create a new response with the body we just read
             return new Response(bodyText, {
@@ -152,7 +153,7 @@ const openaiCompatible = (cleanBaseUrl && cleanApiKey)
               headers: response.headers,
             });
           } catch (readError) {
-            console.error('Failed to read response body:', readError);
+            logger.error('Failed to read response body:', readError);
           }
         }
         
@@ -173,23 +174,23 @@ export async function POST(req: Request) {
     const model = cleanEnvVar(rawModel);
     
     if (baseUrl) {
-      console.log('OpenAI-compatible configuration detected');
-      console.log('Raw base URL:', JSON.stringify(rawBaseUrl));
-      console.log('Processed base URL:', JSON.stringify(baseUrl));
-      console.log('Base URL length:', baseUrl.length);
-      console.log('Raw model name:', JSON.stringify(rawModel));
-      console.log('Processed model name:', JSON.stringify(model));
-      console.log('Model name length:', model?.length);
+      logger.info('OpenAI-compatible configuration detected');
+      logger.debug('Raw base URL:', JSON.stringify(rawBaseUrl));
+      logger.debug('Processed base URL:', JSON.stringify(baseUrl));
+      logger.debug('Base URL length:', baseUrl.length);
+      logger.debug('Raw model name:', JSON.stringify(rawModel));
+      logger.debug('Processed model name:', JSON.stringify(model));
+      logger.debug('Model name length:', model?.length);
       
       if (!apiKey) {
-        console.error('OPENAI_COMPATIBLE_BASE_URL is set but OPENAI_COMPATIBLE_API_KEY is missing');
+        logger.error('OPENAI_COMPATIBLE_BASE_URL is set but OPENAI_COMPATIBLE_API_KEY is missing');
         return Response.json(
           { error: 'OpenAI-compatible API is misconfigured: API key is required when base URL is set' },
           { status: 500 }
         );
       }
       if (!model) {
-        console.error('OPENAI_COMPATIBLE_BASE_URL is set but OPENAI_COMPATIBLE_MODEL is missing');
+        logger.error('OPENAI_COMPATIBLE_BASE_URL is set but OPENAI_COMPATIBLE_MODEL is missing');
         return Response.json(
           { error: 'OpenAI-compatible API is misconfigured: Model name is required when base URL is set' },
           { status: 500 }
@@ -199,7 +200,7 @@ export async function POST(req: Request) {
       // Validate base URL format
       try {
         const urlObj = new URL(baseUrl);
-        console.log('URL validation successful:', {
+        logger.debug('URL validation successful:', {
           protocol: urlObj.protocol,
           hostname: urlObj.hostname,
           pathname: urlObj.pathname
@@ -210,10 +211,10 @@ export async function POST(req: Request) {
           throw new Error('URL must use HTTP or HTTPS protocol');
         }
       } catch (error) {
-        console.error('Invalid OPENAI_COMPATIBLE_BASE_URL format');
-        console.error('Raw value:', JSON.stringify(rawBaseUrl));
-        console.error('Processed value:', JSON.stringify(baseUrl));
-        console.error('Error details:', error);
+        logger.error('Invalid OPENAI_COMPATIBLE_BASE_URL format');
+        logger.error('Raw value:', JSON.stringify(rawBaseUrl));
+        logger.error('Processed value:', JSON.stringify(baseUrl));
+        logger.error('Error details:', error);
         return Response.json(
           { error: `OpenAI-compatible API is misconfigured: Invalid base URL format - ${error instanceof Error ? error.message : 'Invalid URL'}` },
           { status: 500 }
@@ -329,16 +330,16 @@ ${lastMessageText}
       }
     }
 
-    console.log("Enhanced messages:", enhancedMessages);
+    logger.debug("Enhanced messages:", enhancedMessages);
 
     // Determine which model to use
     const useOpenAICompatible = openaiCompatible && model;
     
     // Log which provider is being used
     if (useOpenAICompatible) {
-      console.log(`Using OpenAI-compatible provider: ${baseUrl} with model: ${model}`);
+      logger.info(`Using OpenAI-compatible provider: ${baseUrl} with model: ${model}`);
     } else {
-      console.log('Using AWS Bedrock provider with Claude Sonnet 4.5');
+      logger.info('Using AWS Bedrock provider with Claude Sonnet 4.5');
     }
     
     const selectedModel = useOpenAICompatible 
@@ -360,19 +361,19 @@ ${lastMessageText}
       ? AbortSignal.timeout(parseInt(process.env.OPENAI_COMPATIBLE_TIMEOUT, 10))
       : undefined;
 
-    console.log('=== Starting streamText call ===');
-    console.log('Provider:', useOpenAICompatible ? 'OpenAI-compatible' : 'AWS Bedrock');
+    logger.debug('=== Starting streamText call ===');
+    logger.debug('Provider:', useOpenAICompatible ? 'OpenAI-compatible' : 'AWS Bedrock');
     if (useOpenAICompatible) {
-      console.log('Model:', model);
-      console.log('Base URL:', baseUrl);
-      console.log('API Key (first 10 chars):', cleanApiKey?.substring(0, 10) + '...');
+      logger.debug('Model:', model);
+      logger.debug('Base URL:', baseUrl);
+      logger.debug('API Key (first 10 chars):', cleanApiKey?.substring(0, 10) + '...');
     }
-    console.log('Messages count:', enhancedMessages.length);
-    console.log('First message:', JSON.stringify(enhancedMessages[0], null, 2).substring(0, 300) + '...');
+    logger.debug('Messages count:', enhancedMessages.length);
+    logger.debug('First message:', JSON.stringify(enhancedMessages[0], null, 2).substring(0, 300) + '...');
     
     let result;
     try {
-      console.log('Calling streamText()...');
+      logger.debug('Calling streamText()...');
       result = streamText({
       // model: google("gemini-2.5-flash-preview-05-20"),
       // model: google("gemini-2.5-pro"),
@@ -432,19 +433,19 @@ IMPORTANT: Keep edits concise:
       },
       temperature: 0,
     });
-      console.log('✓ streamText() called successfully');
-      console.log('Result object type:', typeof result);
+      logger.info('✓ streamText() called successfully');
+      logger.debug('Result object type:', typeof result);
     } catch (streamTextError) {
-      console.error('=== streamText() Error ===');
-      console.error('Error calling streamText():', streamTextError);
+      logger.error('=== streamText() Error ===');
+      logger.error('Error calling streamText():', streamTextError);
       throw streamTextError;
     }
 
     // Error handler function to provide detailed error messages
     function errorHandler(error: unknown) {
-      console.error('=== Stream Error Occurred ===');
-      console.error('Error type:', typeof error);
-      console.error('Stream error details:', error);
+      logger.error('=== Stream Error Occurred ===');
+      logger.error('Error type:', typeof error);
+      logger.error('Stream error details:', error);
       
       if (error == null) {
         return 'unknown error';
@@ -455,8 +456,8 @@ IMPORTANT: Keep edits concise:
       }
 
       if (error instanceof Error) {
-        console.error('Error message:', error.message);
-        console.error('Error stack:', error.stack);
+        logger.error('Error message:', error.message);
+        logger.error('Error stack:', error.stack);
         
         // Check if it's an API error with additional context
         const errorObj = error as any;
@@ -475,34 +476,34 @@ IMPORTANT: Keep edits concise:
       return JSON.stringify(error);
     }
 
-    console.log('=== Preparing to stream response ===');
-    console.log('Converting streamText result to UI message stream response');
+    logger.debug('=== Preparing to stream response ===');
+    logger.debug('Converting streamText result to UI message stream response');
 
     let response;
     try {
       response = result.toUIMessageStreamResponse({
         onError: errorHandler,
       });
-      console.log('✓ toUIMessageStreamResponse() called successfully');
-      console.log('Response type:', typeof response);
-      console.log('Response headers:', response.headers);
-      console.log('Response status:', response.status);
+      logger.info('✓ toUIMessageStreamResponse() called successfully');
+      logger.debug('Response type:', typeof response);
+      logger.debug('Response headers:', response.headers);
+      logger.debug('Response status:', response.status);
     } catch (responseError) {
-      console.error('=== toUIMessageStreamResponse() Error ===');
-      console.error('Error converting to response:', responseError);
+      logger.error('=== toUIMessageStreamResponse() Error ===');
+      logger.error('Error converting to response:', responseError);
       throw responseError;
     }
 
-    console.log('✓ Stream response prepared and returning to client');
+    logger.info('✓ Stream response prepared and returning to client');
     
     return response;
   } catch (error) {
-    console.error('=== Fatal Error in Chat Route ===');
-    console.error('Error type:', typeof error);
-    console.error('Error details:', error);
+    logger.error('=== Fatal Error in Chat Route ===');
+    logger.error('Error type:', typeof error);
+    logger.error('Error details:', error);
     if (error instanceof Error) {
-      console.error('Error message:', error.message);
-      console.error('Error stack:', error.stack);
+      logger.error('Error message:', error.message);
+      logger.error('Error stack:', error.stack);
     }
     return Response.json(
       { error: 'Internal server error' },

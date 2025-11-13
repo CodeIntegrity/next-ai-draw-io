@@ -17,6 +17,7 @@ import { ChatInput } from "@/components/chat-input";
 import { ChatMessageDisplay } from "./chat-message-display";
 import { useDiagram } from "@/contexts/diagram-context";
 import { replaceNodes, formatXML } from "@/lib/utils";
+import { logger } from "@/lib/logger";
 
 export default function ChatPanel() {
     const {
@@ -64,8 +65,8 @@ export default function ChatPanel() {
                 api: "/api/chat",
             }),
             onFinish: (message) => {
-                console.log('=== Stream Finished ===');
-                console.log('Final message:', message);
+                logger.debug('=== Stream Finished ===');
+                logger.debug('Final message:', message);
             },
             async onToolCall({ toolCall }) {
                 if (toolCall.toolName === "display_diagram") {
@@ -98,7 +99,7 @@ export default function ChatPanel() {
                             output: `Successfully applied ${edits.length} edit(s) to the diagram.`,
                         });
                     } catch (error) {
-                        console.error("Edit diagram failed:", error);
+                        logger.error("Edit diagram failed:", error);
 
                         const errorMessage = error instanceof Error ? error.message : String(error);
 
@@ -111,19 +112,19 @@ export default function ChatPanel() {
                 }
             },
             onError: (error) => {
-                console.error("Chat error:", error);
+                logger.error("Chat error:", error);
             },
         });
     const messagesEndRef = useRef<HTMLDivElement>(null);
     
     // Track status changes
     useEffect(() => {
-        console.log('=== Chat Status Changed ===');
-        console.log('Status:', status);
+        logger.debug('=== Chat Status Changed ===');
+        logger.debug('Status:', status);
         if (status === 'submitted') {
-            console.log('✓ Request submitted, waiting for response');
+            logger.debug('✓ Request submitted, waiting for response');
         } else if (status === 'ready') {
-            console.log('✓ Ready - awaiting user message');
+            logger.debug('✓ Ready - awaiting user message');
         }
     }, [status]);
     
@@ -138,9 +139,9 @@ export default function ChatPanel() {
         e.preventDefault();
         if (input.trim() && status !== "submitted") {
             try {
-                console.log('=== Sending Message ===');
-                console.log('Input:', input);
-                console.log('Files attached:', files.length);
+                logger.debug('=== Sending Message ===');
+                logger.debug('Input:', input);
+                logger.debug('Files attached:', files.length);
                 
                 // Fetch chart data before sending message
                 let chartXml = await onFetchChart();
@@ -169,7 +170,7 @@ export default function ChatPanel() {
                     }
                 }
 
-                console.log('Sending message to API...');
+                logger.debug('Sending message to API...');
                 sendMessage(
                     { parts },
                     {
@@ -179,14 +180,14 @@ export default function ChatPanel() {
                     }
                 );
 
-                console.log('✓ Message sent, waiting for stream...');
+                logger.debug('✓ Message sent, waiting for stream...');
 
                 // Clear input and files after submission
                 setInput("");
                 setFiles([]);
             } catch (error) {
-                console.error("=== Error Sending Message ===");
-                console.error("Error fetching chart data:", error);
+                logger.error("=== Error Sending Message ===");
+                logger.error("Error fetching chart data:", error);
             }
         }
     };

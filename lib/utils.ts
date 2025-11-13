@@ -1,6 +1,7 @@
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
 import * as pako from 'pako';
+import { logger } from "./logger";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -369,7 +370,7 @@ export function extractDiagramXML(xml_svg_string: string): string {
     return urlDecodedString;
 
   } catch (error) {
-    console.error("Error extracting diagram XML:", error);
+    logger.error("Error extracting diagram XML:", error);
     throw error; // Re-throw for caller handling
   }
 }

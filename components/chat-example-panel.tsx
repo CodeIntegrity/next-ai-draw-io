@@ -1,3 +1,7 @@
+"use client";
+
+import { logger } from "@/lib/logger";
+
 export default function ExamplePanel({
     setInput,
     setFiles,
@@ -18,7 +22,7 @@ export default function ExamplePanel({
             // Set the file to the files state
             setFiles([file]);
         } catch (error) {
-            console.error("Error loading example image:", error);
+            logger.error("Error loading example image:", error);
         }
     };
 
@@ -37,7 +41,7 @@ export default function ExamplePanel({
             // Set the file to the files state
             setFiles([file]);
         } catch (error) {
-            console.error("Error loading architecture image:", error);
+            logger.error("Error loading architecture image:", error);
         }
     };
     return (

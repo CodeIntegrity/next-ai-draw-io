@@ -487,52 +487,63 @@ IMPORTANT: Keep edits concise:
       throw responseError;
     }
 
-    // Wrap the response to log stream chunks for debugging
-    if (logger.isDebugEnabled() && response.body) {
-      logger.debug('=== Wrapping response stream for chunk logging ===');
+    if (response.body) {
+      logger.debug('=== Wrapping response stream for forwarding ===');
       const originalBody = response.body;
       const reader = originalBody.getReader();
       let uiChunkCount = 0;
       let totalBytes = 0;
 
+      const textDecoder = logger.isDebugEnabled() ? new TextDecoder() : null;
+
       const wrappedStream = new ReadableStream({
         async start(controller) {
-          logger.debug('UI message stream reading started');
+          logger.info('✓ UI message stream forwarding started');
           try {
             while (true) {
               const { done, value } = await reader.read();
               
               if (done) {
-                logger.info(`✓ UI message stream complete. Total chunks: ${uiChunkCount}, Total bytes: ${totalBytes}`);
+                logger.info(`✓ UI message stream complete. Total chunks forwarded: ${uiChunkCount}, Total bytes: ${totalBytes}`);
                 controller.close();
                 break;
               }
               
               uiChunkCount++;
               totalBytes += value.length;
-              const text = new TextDecoder().decode(value);
-              logger.debug(`[UI Stream] Chunk ${uiChunkCount} (${value.length} bytes):`, text.substring(0, 150) + (text.length > 150 ? '...' : ''));
+              
+              if (textDecoder) {
+                const text = textDecoder.decode(value, { stream: true });
+                logger.debug(`[Forwarding] Chunk ${uiChunkCount} (${value.length} bytes):`, text.substring(0, 150) + (text.length > 150 ? '...' : ''));
+              } else if (uiChunkCount === 1) {
+                logger.info(`✓ First chunk forwarded (${value.length} bytes)`);
+              }
               
               controller.enqueue(value);
             }
           } catch (error) {
-            logger.error('=== UI message stream reading error ===', error);
+            logger.error('=== UI message stream forwarding error ===', error);
             controller.error(error);
           }
         }
       });
 
+      const enhancedHeaders = new Headers(response.headers);
+      enhancedHeaders.set('Content-Type', 'text/event-stream');
+      enhancedHeaders.set('Cache-Control', 'no-cache, no-transform');
+      enhancedHeaders.set('Connection', 'keep-alive');
+      enhancedHeaders.set('X-Accel-Buffering', 'no');
+      
       response = new Response(wrappedStream, {
         status: response.status,
         statusText: response.statusText,
-        headers: response.headers,
+        headers: enhancedHeaders,
       });
       
-      logger.debug('Response stream wrapped successfully');
+      logger.debug('Response stream wrapped with enhanced headers');
     }
 
-    logger.info('✓ Stream response prepared and returning to client');
-    
+    logger.info('✓ Stream response returning to client');
     return response;
   } catch (error) {
     logger.error('=== Fatal Error in Chat Route ===');

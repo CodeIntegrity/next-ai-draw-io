@@ -1,7 +1,7 @@
 import { bedrock } from '@ai-sdk/amazon-bedrock';
 import { openai } from '@ai-sdk/openai';
 import { google } from '@ai-sdk/google';
-import { smoothStream, streamText, convertToModelMessages } from 'ai';
+import { streamText, convertToModelMessages } from 'ai';
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { createOpenAI } from '@ai-sdk/openai';
@@ -10,7 +10,6 @@ import { z } from "zod/v3";
 import { replaceXMLParts } from "@/lib/utils";
 import { logger } from "@/lib/logger";
 
-export const maxDuration = 60
 const openrouter = createOpenRouter({ apiKey: process.env.OPENROUTER_API_KEY });
 
 // Helper function to clean environment variable strings (remove quotes and trim)
@@ -356,11 +355,6 @@ ${lastMessageText}
       };
     }
 
-    // Add timeout if specified for OpenAI compatible API
-    const abortSignal = useOpenAICompatible && process.env.OPENAI_COMPATIBLE_TIMEOUT
-      ? AbortSignal.timeout(parseInt(process.env.OPENAI_COMPATIBLE_TIMEOUT, 10))
-      : undefined;
-
     logger.debug('=== Starting streamText call ===');
     logger.debug('Provider:', useOpenAICompatible ? 'OpenAI-compatible' : 'AWS Bedrock');
     if (useOpenAICompatible) {
@@ -395,7 +389,6 @@ ${lastMessageText}
       //   },
       // },
       ...(Object.keys(providerOptions).length > 0 && { providerOptions }),
-      ...(abortSignal && { abortSignal }),
       messages: enhancedMessages,
       tools: {
         // Client-side tool that will be executed on the client
@@ -492,6 +485,50 @@ IMPORTANT: Keep edits concise:
       logger.error('=== toUIMessageStreamResponse() Error ===');
       logger.error('Error converting to response:', responseError);
       throw responseError;
+    }
+
+    // Wrap the response to log stream chunks for debugging
+    if (logger.isDebugEnabled() && response.body) {
+      logger.debug('=== Wrapping response stream for chunk logging ===');
+      const originalBody = response.body;
+      const reader = originalBody.getReader();
+      let uiChunkCount = 0;
+      let totalBytes = 0;
+
+      const wrappedStream = new ReadableStream({
+        async start(controller) {
+          logger.debug('UI message stream reading started');
+          try {
+            while (true) {
+              const { done, value } = await reader.read();
+              
+              if (done) {
+                logger.info(`✓ UI message stream complete. Total chunks: ${uiChunkCount}, Total bytes: ${totalBytes}`);
+                controller.close();
+                break;
+              }
+              
+              uiChunkCount++;
+              totalBytes += value.length;
+              const text = new TextDecoder().decode(value);
+              logger.debug(`[UI Stream] Chunk ${uiChunkCount} (${value.length} bytes):`, text.substring(0, 150) + (text.length > 150 ? '...' : ''));
+              
+              controller.enqueue(value);
+            }
+          } catch (error) {
+            logger.error('=== UI message stream reading error ===', error);
+            controller.error(error);
+          }
+        }
+      });
+
+      response = new Response(wrappedStream, {
+        status: response.status,
+        statusText: response.statusText,
+        headers: response.headers,
+      });
+      
+      logger.debug('Response stream wrapped successfully');
     }
 
     logger.info('✓ Stream response prepared and returning to client');

@@ -1,14 +1,20 @@
 import { bedrock } from '@ai-sdk/amazon-bedrock';
-import { openai } from '@ai-sdk/openai';
-import { google } from '@ai-sdk/google';
 import { streamText, convertToModelMessages } from 'ai';
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
-import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { createOpenAI } from '@ai-sdk/openai';
+import { Agent, setGlobalDispatcher } from 'undici';
 
 import { z } from "zod/v3";
-import { replaceXMLParts } from "@/lib/utils";
 import { logger } from "@/lib/logger";
+
+export const maxDuration = 3600;
+
+const streamingAgent = new Agent({
+  bodyTimeout: 0,
+  headersTimeout: 0,
+});
+
+setGlobalDispatcher(streamingAgent);
 
 const openrouter = createOpenRouter({ apiKey: process.env.OPENROUTER_API_KEY });
 
@@ -49,11 +55,18 @@ const openaiCompatible = (cleanBaseUrl && cleanApiKey)
           }
         }
         
-        // Make the actual fetch request
-        logger.debug('Making fetch request...');
+        const modifiedInit: RequestInit & { dispatcher?: any } = init ? { ...init } : {};
+        if (modifiedInit.signal) {
+          delete (modifiedInit as { signal?: AbortSignal }).signal;
+          logger.debug('Removed AbortSignal to prevent timeout');
+        }
+        
+        modifiedInit.dispatcher = streamingAgent;
+        
+        logger.debug('Making fetch request without timeout restrictions...');
         let response: Response;
         try {
-          response = await fetch(url, init);
+          response = await fetch(url, modifiedInit);
         } catch (fetchError) {
           logger.error('=== Fetch Error ===');
           logger.error('Failed to connect to API:', fetchError);

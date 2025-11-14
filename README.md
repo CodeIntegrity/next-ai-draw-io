@@ -63,7 +63,6 @@ If you want to use an OpenAI-compatible API endpoint (such as a self-hosted mode
 OPENAI_COMPATIBLE_BASE_URL="https://your-api-endpoint.com/v1"
 OPENAI_COMPATIBLE_MODEL="your-model-name"
 OPENAI_COMPATIBLE_API_KEY="your-api-key"
-OPENAI_COMPATIBLE_TIMEOUT="60000"  # Optional, default timeout in milliseconds
 ```
 
 **重要说明：**

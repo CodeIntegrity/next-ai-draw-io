@@ -311,7 +311,6 @@ Required environment variables:
 OPENAI_COMPATIBLE_BASE_URL=https://api.newapi.com/v1
 OPENAI_COMPATIBLE_MODEL=gpt-4o-mini
 OPENAI_COMPATIBLE_API_KEY=your-api-key-here
-OPENAI_COMPATIBLE_TIMEOUT=60000  # Optional, in milliseconds
 ```
 
 ## Useful Commands

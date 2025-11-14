@@ -241,11 +241,7 @@ The AI SDK handles these automatically.
 
 ### Timeout Configuration
 
-Default timeout is 60 seconds (`maxDuration = 60`). For longer responses, you can increase it:
-
-```env
-OPENAI_COMPATIBLE_TIMEOUT=120000  # 120 seconds
-```
+The streaming route no longer enforces a fixed timeout. Long-running streams will continue until the provider completes the response.
 
 ## Support
 
